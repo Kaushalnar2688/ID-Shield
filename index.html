@@ -105,7 +105,8 @@
                 <div class="flex flex-col md:flex-row md:items-center justify-between border-b border-gray-100 pb-6 mb-6 gap-4">
                     <div>
                         <h3 class="text-2xl font-bold text-navy">Screening Results</h3>
-                        <p class="text-gray-500 mt-1" id="res-subtitle">Experimental signal check &mdash; not proof either way</p>
+                        <p class="text-gray-500 mt-1" id="res-subtitle">&nbsp;</p>
+                        <p class="text-xs text-gray-400 mt-1" id="res-engine"></p>
                     </div>
                     <div id="res-badge" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-lg w-max"></div>
                 </div>
@@ -378,9 +379,20 @@
                 await new Promise(r => setTimeout(r, 50));
 
                 const arrayBuffer = await file.arrayBuffer();
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                // Decoding at 16 kHz resamples for us; the wav2vec2 family expects 16 kHz mono.
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
                 const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-                const analysis = analyzeAudioBuffer(audioBuffer);
+
+                let analysis;
+                try {
+                    analysis = await analyzeWithModel(audioBuffer);
+                } catch (modelErr) {
+                    console.warn('Model unavailable, using basic screen:', modelErr);
+                    const why = String((modelErr && modelErr.message) || modelErr).slice(0, 140);
+                    showNotification('error', 'Detection model failed to load: ' + why);
+                    window.__lastModelError = why;
+                    analysis = analyzeAudioBuffer(audioBuffer);
+                }
                 renderAudioResults(analysis);
             } catch (error) {
                 console.error('Audio processing error:', error);
@@ -390,6 +402,103 @@
                 overlay.classList.add('hidden');
                 busy = false;
             }
+        }
+
+        /* ---------- trained detector (transformers.js, runs in the browser) ----------
+         * IMPORTANT: a model is only as trustworthy as the evidence behind it.
+         * Run eval/evaluate.py on YOUR OWN real + cloned + phone-compressed clips,
+         * then set the thresholds below from those results, not from a model card.
+         */
+        const MODEL_ID = 'ai8shiro/deepfake-audio-wav2vec2-ONNX';   // swap after evaluating candidates
+        const TRANSFORMERS_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1';
+        const THRESH_HIGH = 0.85;   // spoof prob >= this  -> "Synthetic voice likely"   (TUNE on your eval set)
+        const THRESH_MED  = 0.50;   // spoof prob >= this  -> "Possibly synthetic"       (TUNE on your eval set)
+        const MODEL_VALIDATED = false; // set true ONLY after you have measured accuracy yourself
+        const SEG_SECONDS = 6, MAX_SEGMENTS = 4;
+
+        let classifierPromise = null;
+        function getClassifier() {
+            if (!classifierPromise) {
+                classifierPromise = import(TRANSFORMERS_URL).then(m =>
+                    m.pipeline('audio-classification', MODEL_ID)
+                ).catch(err => { classifierPromise = null; throw err; });
+            }
+            return classifierPromise;
+        }
+
+        function spoofProbability(scores) {
+            const spoof = scores.find(x => /spoof|fake|synth|deepfake|\bai\b/i.test(x.label));
+            if (spoof) return spoof.score;
+            const real = scores.find(x => /bona|real|genuine|human/i.test(x.label));
+            if (real) return 1 - real.score;
+            throw new Error('Unrecognized model labels: ' + scores.map(x => x.label).join(', '));
+        }
+
+        async function analyzeWithModel(audioBuffer) {
+            const sr = audioBuffer.sampleRate; // 16000 because we decoded at 16 kHz
+            const mono = new Float32Array(audioBuffer.length);
+            for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
+                const d = audioBuffer.getChannelData(ch);
+                for (let i = 0; i < mono.length; i++) mono[i] += d[i] / audioBuffer.numberOfChannels;
+            }
+
+            // Pick up to MAX_SEGMENTS loud 6-second windows spread across the file.
+            const segLen = SEG_SECONDS * sr;
+            const starts = [];
+            const n = Math.max(1, Math.min(MAX_SEGMENTS, Math.ceil(mono.length / segLen)));
+            for (let k = 0; k < n; k++) starts.push(Math.floor(k * Math.max(0, mono.length - segLen) / Math.max(1, n - 1)));
+            const segments = starts.map(st => mono.slice(st, st + segLen)).filter(seg => {
+                let e = 0; for (let i = 0; i < seg.length; i++) e += seg[i] * seg[i];
+                return Math.sqrt(e / seg.length) > 0.008 && seg.length > sr; // skip silence and <1 s scraps
+            });
+            if (segments.length === 0) return evaluateMetrics(emptyFeatures());
+
+            document.querySelector('#processing-overlay h3').textContent = 'Loading detection model (first time may take a minute)...';
+            const classifier = await getClassifier();
+            document.querySelector('#processing-overlay h3').textContent = 'Analyzing audio...';
+
+            const probs = [];
+            for (const seg of segments) {
+                const out = await classifier(seg, { top_k: 5 });
+                probs.push(spoofProbability(out));
+            }
+            const mean = probs.reduce((a, b) => a + b, 0) / probs.length;
+            const max = Math.max(...probs);
+
+            let level;
+            if (mean >= THRESH_HIGH) level = 'Unusual';
+            else if (mean >= THRESH_MED || max >= THRESH_HIGH) level = 'Slightly unusual';
+            else level = 'Typical';
+
+            const pct = v => Math.round(v * 100) + '%';
+            console.info('Model', MODEL_ID, 'per-segment spoof probabilities:', probs);
+            const flags = [
+                `Per-segment scores: ${probs.map(pct).join(', ')}  (thresholds: possibly ≥ ${pct(THRESH_MED)}, likely ≥ ${pct(THRESH_HIGH)}).`,
+                `Model score: ${pct(mean)} synthetic on average across ${probs.length} segment(s) (highest segment ${pct(max)}).`,
+                MODEL_VALIDATED
+                    ? 'This model was tested on our own recordings, but real-world accuracy is still imperfect.'
+                    : 'This model has NOT been independently validated on phone-call audio. Treat the score as a hint, not a verdict.'
+            ];
+            const lead = {
+                'Unusual': 'The model flagged this voice as likely synthetic. Do not act on the call. Verify through a second channel.',
+                'Slightly unusual': 'The model is unsure. Verify the caller before acting on any request.',
+                'Typical': 'The model did not flag this voice. Newer voice clones can fool it, so still verify.'
+            }[level];
+
+            return {
+                level, source: 'model', flags,
+                actions: [lead, ...baseActionList()],
+                entropy: '--', flatness: '--', dynamics: '--', voiced: '--',
+                score: pct(mean)
+            };
+        }
+
+        function baseActionList() {
+            return [
+                'Never send money, gift cards, crypto, passwords, or verification codes because of a phone call.',
+                'Hang up and call the person or organization back on a number you already trust (saved contact, back of your card).',
+                'Agree on a family "safe word" now. A real relative can say it; a cloned voice can’t.'
+            ];
         }
 
         /* ---------- signal analysis ----------
@@ -589,15 +698,21 @@
 
             if (flags.length === 0) flags.push('Nothing stood out in these basic measurements. This does NOT mean the voice is real.');
 
+            // These thresholds were never calibrated on real speech: ordinary clean voices
+            // routinely trip them. So this screen reports observations only, never a verdict.
+            console.info('Basic screen would have scored', level, 'with', points, 'points', f);
+            level = 'Inconclusive';
+            flags.unshift('Basic screen only: these numbers are shown for transparency and are not a verdict.');
+
             const lead = {
                 'Unusual': 'Several unusual audio properties were found. Verify the caller through a second channel before acting.',
                 'Slightly unusual': 'A couple of properties were unusual. This alone means little. Verify before acting on any request.',
                 'Typical': 'Nothing unusual in these basic measurements. Modern voice clones can look typical, so still verify.',
-                'Inconclusive': 'The screen could not assess this recording. Use independent verification.'
+                'Inconclusive': 'No verdict from the basic screen. Use independent verification.'
             }[level];
 
             return {
-                level, flags, actions: [lead, ...baseActions],
+                level, source: 'screen', flags, actions: [lead, ...baseActions],
                 entropy: f.spectralEntropy.toFixed(3),
                 flatness: f.spectralFlatness.toFixed(3),
                 dynamics: (f.energyVariability * 100).toFixed(1) + ' %',
@@ -615,7 +730,16 @@
                 'Typical':          ['bg-slate-100 text-slate-700', 'activity', 'Nothing Unusual Found'],
                 'Inconclusive':     ['bg-gray-100 text-gray-700', 'help-circle', 'Inconclusive']
             };
-            const [cls, icon, label] = styles[data.level];
+            const [cls, icon, baseLabel] = styles[data.level];
+            const modelLabels = { 'Unusual': 'Synthetic Voice Likely', 'Slightly unusual': 'Possibly Synthetic', 'Typical': 'Not Flagged by Model' };
+            const label = data.source === 'model' ? (modelLabels[data.level] || baseLabel)
+                        : (data.source === 'screen' ? 'No Verdict (Basic Screen)' : baseLabel);
+            document.getElementById('res-subtitle').textContent = data.source === 'model'
+                ? `Detection model score: ${data.score} synthetic (not proof either way)`
+                : 'Basic signal screen only (model unavailable) — not proof either way';
+            document.getElementById('res-engine').textContent = data.source === 'model'
+                ? 'Engine: trained model ' + MODEL_ID
+                : 'Engine: basic screen. Model did not run' + (window.__lastModelError ? ' (' + window.__lastModelError + ')' : '') + '.';
             const badge = document.getElementById('res-badge');
             badge.className = `inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-lg w-max ${cls}`;
             badge.innerHTML = `<i data-lucide="${icon}" class="w-6 h-6"></i><span>${label}</span>`;
@@ -652,8 +776,8 @@
         //    publishable (anon) key below. These are safe to ship in the browser ONLY because
         //    Row Level Security (see supabase/schema.sql) restricts what they can do.
         // 2) NEVER paste the service_role / secret key here.
-        const SUPABASE_URL = 'https://ygnrfhvkmvmedswlbigo.supabase.co';        // e.g. https://abcdxyz.supabase.co
-        const SUPABASE_KEY = 'sb_publishable_9CPQAqSRP_Hi9q5lFy2g7A_fdTBQUGR';
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';        // e.g. https://abcdxyz.supabase.co
+        const SUPABASE_KEY = 'YOUR_SUPABASE_PUBLISHABLE_KEY';
 
         const sb = (window.supabase && !SUPABASE_URL.startsWith('YOUR_'))
             ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
