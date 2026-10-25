@@ -1,37 +1,26 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ID-Shield | AI Consumer Protection</title>
-    
-    <!-- Tailwind CSS CDN -->
+    <title>ID-Shield | Consumer Scam Defense</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Leaflet Map CSS and JS -->
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    
-    <!-- Lucide Icons Library -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Pinned version: "@latest" can break your app without warning -->
+    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js"></script>
 
     <script>
         tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        navy: '#0F172A',
-                        shieldBlue: '#2563EB',
-                        alertOrange: '#F97316',
-                        slateBg: '#F8FAFC'
-                    }
-                }
-            }
+            theme: { extend: {
+                fontFamily: { sans: ['Inter', 'sans-serif'] },
+                colors: { navy: '#0F172A', shieldBlue: '#2563EB', alertOrange: '#F97316', slateBg: '#F8FAFC' }
+            } }
         }
     </script>
 
@@ -39,97 +28,91 @@
         body { font-family: 'Inter', sans-serif; background-color: #F8FAFC; color: #0F172A; }
         .hidden { display: none !important; }
         .tab-active { border-bottom: 3px solid #2563EB; color: #2563EB; font-weight: 600; }
-        .tab-inactive { color: #64748B; font-weight: 500; }
+        .tab-inactive { color: #64748B; font-weight: 500; border-bottom: 3px solid transparent; }
         .tab-inactive:hover { color: #0F172A; }
         #map-container { height: 450px; width: 100%; border-radius: 0.75rem; z-index: 10; }
         .dropzone-active { border-color: #2563EB; background-color: #EFF6FF; }
-        
-        /* Custom scrollbar styling */
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #F1F5F9; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+        :focus-visible { outline: 3px solid #2563EB; outline-offset: 2px; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
 
     <header class="bg-navy text-white shadow-md">
         <div class="max-w-6xl mx-auto px-4 py-5 sm:px-6 lg:px-8">
-            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div class="flex items-center gap-3">
-                    <i data-lucide="shield-check" class="w-10 h-10 text-shieldBlue"></i>
-                    <div>
-                        <h1 class="text-2xl font-bold tracking-tight">ID-Shield</h1>
-                        <p class="text-sm text-slate-300">AI-Powered Consumer Defense for IL-11</p>
-                    </div>
+            <div class="flex items-center gap-3">
+                <i data-lucide="shield-check" class="w-10 h-10 text-shieldBlue" aria-hidden="true"></i>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight">ID-Shield</h1>
+                    <p class="text-sm text-slate-300">Scam awareness &amp; defense tools for IL-11</p>
                 </div>
             </div>
         </div>
     </header>
 
-    <nav class="bg-white border-b border-gray-200 sticky top-0 z-20">
+    <nav class="bg-white border-b border-gray-200 sticky top-0 z-20" aria-label="Main">
         <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex space-x-8" aria-label="Tabs" id="nav-tabs">
-                <button data-target="tab-analyze" class="tab-active whitespace-nowrap py-4 px-1 flex items-center gap-2 transition-colors">
-                    <i data-lucide="mic" class="w-5 h-5"></i> Analyze Audio
+            <div class="flex space-x-6 overflow-x-auto" role="tablist" id="nav-tabs">
+                <button role="tab" id="btn-tab-analyze" aria-controls="tab-analyze" aria-selected="true" data-target="tab-analyze" class="tab-active whitespace-nowrap py-4 px-1 flex items-center gap-2 transition-colors">
+                    <i data-lucide="mic" class="w-5 h-5" aria-hidden="true"></i> Voice Check
                 </button>
-                <button data-target="tab-map" class="tab-inactive whitespace-nowrap py-4 px-1 flex items-center gap-2 transition-colors">
-                    <i data-lucide="map-pin" class="w-5 h-5"></i> Local Threat Map
+                <button role="tab" id="btn-tab-map" aria-controls="tab-map" aria-selected="false" data-target="tab-map" class="tab-inactive whitespace-nowrap py-4 px-1 flex items-center gap-2 transition-colors">
+                    <i data-lucide="map-pin" class="w-5 h-5" aria-hidden="true"></i> Local Threat Map
                 </button>
-                <button data-target="tab-simulator" class="tab-inactive whitespace-nowrap py-4 px-1 flex items-center gap-2 transition-colors">
-                    <i data-lucide="graduation-cap" class="w-5 h-5"></i> Scam Simulator
+                <button role="tab" id="btn-tab-simulator" aria-controls="tab-simulator" aria-selected="false" data-target="tab-simulator" class="tab-inactive whitespace-nowrap py-4 px-1 flex items-center gap-2 transition-colors">
+                    <i data-lucide="graduation-cap" class="w-5 h-5" aria-hidden="true"></i> Scam Simulator
                 </button>
             </div>
         </div>
     </nav>
 
-    <!-- Global Notification Container -->
-    <div id="notification-container" class="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 w-full max-w-md px-4 pointer-events-none"></div>
+    <div id="notification-container" aria-live="polite" class="fixed top-24 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 w-full max-w-md px-4 pointer-events-none"></div>
 
     <main class="flex-grow max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8 w-full">
-        
-        <section id="tab-analyze" class="tab-content block animate-fade-in">
-            <div class="text-center mb-8">
+
+        <!-- ============ TAB 1: VOICE CHECK ============ -->
+        <section id="tab-analyze" role="tabpanel" aria-labelledby="btn-tab-analyze" class="tab-content">
+            <div class="text-center mb-6">
                 <h2 class="text-3xl font-bold text-navy">Check a Suspicious Call</h2>
-                <p class="mt-2 text-gray-600 max-w-2xl mx-auto">Upload a voicemail or recording to scan for AI synthetic voice anomalies (deepfakes). Processing runs entirely locally on your device.</p>
+                <p class="mt-2 text-gray-600 max-w-2xl mx-auto">Upload a voicemail or recording for an experimental signal screen. Your audio is analyzed in your browser and is never uploaded.</p>
             </div>
 
-            <!-- Drag and Drop Audio Zone -->
-            <div id="dropzone" class="border-4 border-dashed border-gray-300 rounded-2xl bg-white p-12 text-center transition-all cursor-pointer hover:border-shieldBlue hover:bg-blue-50 relative group" tabindex="0" aria-label="Drop audio file here or click to upload">
-                <input type="file" id="audio-input" accept=".mp3,.wav,.m4a,audio/*" class="hidden">
+            <div class="max-w-3xl mx-auto mb-8 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900 flex gap-3">
+                <i data-lucide="info" class="w-5 h-5 flex-shrink-0 mt-0.5" aria-hidden="true"></i>
+                <p><strong>This tool cannot tell you whether a voice is AI.</strong> It measures simple audio properties and is not a trained deepfake detector. A cloned voice can pass it, and a real voice can trip it. Phone compression and background noise change the numbers. <strong>Whatever the result, verify the caller using the steps shown.</strong></p>
+            </div>
+
+            <div id="dropzone" role="button" class="border-4 border-dashed border-gray-300 rounded-2xl bg-white p-12 text-center transition-all cursor-pointer hover:border-shieldBlue hover:bg-blue-50 relative group" tabindex="0" aria-label="Choose an audio file to check, or drop one here">
+                <input type="file" id="audio-input" accept=".mp3,.wav,.m4a,.aac,.ogg,audio/*" class="hidden">
                 <div id="dropzone-content">
                     <div class="bg-blue-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                        <i data-lucide="upload-cloud" class="w-10 h-10 text-shieldBlue"></i>
+                        <i data-lucide="upload-cloud" class="w-10 h-10 text-shieldBlue" aria-hidden="true"></i>
                     </div>
-                    <h3 class="text-xl font-semibold text-navy">Drag & Drop Audio File Here</h3>
-                    <p class="text-gray-500 mt-2">Supports .mp3, .wav, .m4a</p>
-                    <button class="mt-6 bg-shieldBlue hover:bg-blue-700 text-white px-6 py-3 rounded-full font-medium transition-colors shadow-sm focus:ring-4 focus:ring-blue-300 outline-none">
-                        Browse Files
-                    </button>
+                    <h3 class="text-xl font-semibold text-navy">Drag &amp; Drop Audio File Here</h3>
+                    <p class="text-gray-500 mt-2">.mp3, .wav, .m4a, .aac, .ogg &middot; up to 25 MB</p>
+                    <span class="mt-6 inline-block bg-shieldBlue group-hover:bg-blue-700 text-white px-6 py-3 rounded-full font-medium transition-colors shadow-sm">Browse Files</span>
                 </div>
-                <!-- Loading Overlay -->
                 <div id="processing-overlay" class="absolute inset-0 bg-white/95 rounded-2xl flex flex-col items-center justify-center hidden">
-                    <i data-lucide="loader-2" class="w-12 h-12 text-shieldBlue animate-spin mb-4"></i>
-                    <h3 class="text-lg font-bold text-navy">Running Spectral Analysis...</h3>
-                    <p class="text-gray-500 text-sm">Evaluating pitch entropy & speech dynamics</p>
+                    <i data-lucide="loader-2" class="w-12 h-12 text-shieldBlue animate-spin mb-4" aria-hidden="true"></i>
+                    <h3 class="text-lg font-bold text-navy">Analyzing audio...</h3>
+                    <p class="text-gray-500 text-sm">Running on your device</p>
                 </div>
             </div>
 
             <div id="analysis-results" class="hidden mt-8 bg-white rounded-2xl shadow-sm border border-gray-200 p-6 md:p-8">
                 <div class="flex flex-col md:flex-row md:items-center justify-between border-b border-gray-100 pb-6 mb-6 gap-4">
                     <div>
-                        <h3 class="text-2xl font-bold text-navy">Diagnostic Results</h3>
-                        <p class="text-gray-500 mt-1" id="res-confidence">Confidence Score: --%</p>
+                        <h3 class="text-2xl font-bold text-navy">Screening Results</h3>
+                        <p class="text-gray-500 mt-1" id="res-subtitle">Experimental signal check &mdash; not proof either way</p>
                     </div>
-                    <div id="res-badge" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-lg w-max">
-                        <!-- Filled dynamically -->
-                    </div>
+                    <div id="res-badge" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-lg w-max"></div>
                 </div>
 
-                <!-- Audio Preview Player -->
                 <div class="mb-8 bg-slateBg p-4 rounded-xl border border-gray-200">
                     <h4 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2">
-                        <i data-lucide="play-circle" class="w-4 h-4"></i> Audio Preview
+                        <i data-lucide="play-circle" class="w-4 h-4" aria-hidden="true"></i> Audio Preview
                     </h4>
                     <audio id="audio-preview" controls class="w-full h-12 outline-none rounded-full"></audio>
                 </div>
@@ -137,73 +120,61 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
                         <h4 class="font-semibold text-lg flex items-center gap-2 text-navy mb-4">
-                            <i data-lucide="alert-triangle" class="w-5 h-5 text-alertOrange"></i> Detected Anomalies
+                            <i data-lucide="alert-triangle" class="w-5 h-5 text-alertOrange" aria-hidden="true"></i> What the screen noticed
                         </h4>
-                        <ul id="res-flags" class="space-y-3">
-                            <!-- Filled dynamically -->
-                        </ul>
+                        <ul id="res-flags" class="space-y-3"></ul>
                         <div class="mt-6 p-4 bg-slateBg rounded-xl border border-gray-200">
                             <h5 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Raw Metrics</h5>
                             <div class="font-mono text-sm text-gray-700 grid grid-cols-2 gap-2">
                                 <span>Spectral Entropy:</span> <span id="res-entropy" class="font-semibold">--</span>
                                 <span>Spectral Flatness:</span> <span id="res-flatness" class="font-semibold">--</span>
-                                <span>Energy Variability:</span> <span id="res-dynamics" class="font-semibold">-- %</span>
-                                <span>Voiced Frames:</span> <span id="res-voiced" class="font-semibold">-- %</span>
+                                <span>Energy Variability:</span> <span id="res-dynamics" class="font-semibold">--</span>
+                                <span>Voiced Frames:</span> <span id="res-voiced" class="font-semibold">--</span>
                             </div>
-                            <p class="text-[11px] text-gray-500 mt-3 leading-relaxed">
-                                Screening result only — this is a browser-side acoustic heuristic, not forensic proof of an AI-generated voice.
-                            </p>
                         </div>
                     </div>
 
                     <div>
                         <h4 class="font-semibold text-lg flex items-center gap-2 text-navy mb-4">
-                            <i data-lucide="shield" class="w-5 h-5 text-shieldBlue"></i> Recommended Actions
+                            <i data-lucide="shield" class="w-5 h-5 text-shieldBlue" aria-hidden="true"></i> What to do (always)
                         </h4>
-                        <div id="res-actions" class="bg-blue-50 border border-blue-100 rounded-xl p-5 space-y-4">
-                            <!-- Filled dynamically -->
-                        </div>
+                        <div id="res-actions" class="bg-blue-50 border border-blue-100 rounded-xl p-5 space-y-4"></div>
                     </div>
                 </div>
                 <div class="mt-8 text-center">
-                    <button id="btn-reset-audio" class="text-shieldBlue font-medium hover:underline focus:outline-none">Scan Another File</button>
+                    <button id="btn-reset-audio" class="text-shieldBlue font-medium hover:underline">Check Another File</button>
                 </div>
             </div>
         </section>
 
-        <section id="tab-map" class="tab-content hidden">
+        <!-- ============ TAB 2: MAP ============ -->
+        <section id="tab-map" role="tabpanel" aria-labelledby="btn-tab-map" class="tab-content hidden">
             <div class="text-center mb-8">
-                <h2 class="text-3xl font-bold text-navy">Active Scams in IL-11</h2>
-                <p class="mt-2 text-gray-600 max-w-2xl mx-auto">Track and report community fraud activity. Data is crowdsourced from residents in Aurora, Naperville, Joliet, Elgin, and surrounding areas.</p>
+                <h2 class="text-3xl font-bold text-navy">Scam Reports Near You</h2>
+                <p class="mt-2 text-gray-600 max-w-2xl mx-auto"><span id="map-intro">Pin scam attempts you've seen.</span></p>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Map and Feed Column -->
                 <div class="lg:col-span-2 flex flex-col gap-6">
                     <div class="bg-white p-2 rounded-2xl shadow-sm border border-gray-200">
-                        <div id="map-container"></div>
+                        <div id="map-container" aria-label="Map of reported scams"></div>
                     </div>
-                    
-                    <!-- Community Warnings Feed -->
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex-grow">
                         <h3 class="text-xl font-bold text-navy mb-4 flex items-center gap-2">
-                            <i data-lucide="message-square" class="w-5 h-5 text-shieldBlue"></i> Community Warnings
+                            <i data-lucide="message-square" class="w-5 h-5 text-shieldBlue" aria-hidden="true"></i> Community Warnings
                         </h3>
-                        <div id="community-feed" class="space-y-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
-                            <!-- Filled dynamically by JS -->
-                        </div>
+                        <div id="community-feed" class="space-y-4 max-h-64 overflow-y-auto pr-2 custom-scrollbar"></div>
                     </div>
                 </div>
 
-                <!-- Report Incident Form Column -->
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 h-fit">
                     <h3 class="text-xl font-bold text-navy mb-4 flex items-center gap-2">
-                        <i data-lucide="plus-circle" class="w-5 h-5 text-shieldBlue"></i> Report an Incident
+                        <i data-lucide="plus-circle" class="w-5 h-5 text-shieldBlue" aria-hidden="true"></i> Report an Incident
                     </h3>
                     <form id="report-form" class="space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1" for="report-type">Scam Type</label>
-                            <select id="report-type" required class="w-full rounded-lg border-gray-300 border p-2.5 focus:ring-shieldBlue focus:border-shieldBlue outline-none">
+                            <select id="report-type" required class="w-full rounded-lg border-gray-300 border p-2.5">
                                 <option value="">Select Category...</option>
                                 <option value="AI Voice Cloning">AI Voice Cloning / Robocall</option>
                                 <option value="Phishing Text">SMS / Email Phishing</option>
@@ -213,876 +184,752 @@
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1" for="report-city">City/Town in IL-11</label>
-                            <select id="report-city" required class="w-full rounded-lg border-gray-300 border p-2.5 focus:ring-shieldBlue focus:border-shieldBlue outline-none">
+                            <label class="block text-sm font-medium text-gray-700 mb-1" for="report-city">City/Town</label>
+                            <select id="report-city" required class="w-full rounded-lg border-gray-300 border p-2.5">
                                 <option value="">Select City...</option>
-                                <option value="41.7606,-88.3201,Aurora">Aurora</option>
-                                <option value="41.7508,-88.1535,Naperville">Naperville</option>
-                                <option value="41.5250,-88.0817,Joliet">Joliet</option>
-                                <option value="42.0354,-88.2826,Elgin">Elgin</option>
-                                <option value="42.2411,-88.3162,Crystal Lake">Crystal Lake</option>
+                                <option value="Aurora">Aurora</option>
+                                <option value="Naperville">Naperville</option>
+                                <option value="Bolingbrook">Bolingbrook</option>
+                                <option value="Joliet">Joliet</option>
+                                <option value="Elgin">Elgin</option>
                             </select>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1" for="report-desc">Description</label>
-                            <textarea id="report-desc" rows="3" required class="w-full rounded-lg border-gray-300 border p-2.5 focus:ring-shieldBlue focus:border-shieldBlue outline-none" placeholder="Brief details to warn neighbors..."></textarea>
+                            <textarea id="report-desc" rows="3" required maxlength="300" class="w-full rounded-lg border-gray-300 border p-2.5" placeholder="What happened? (max 300 characters)"></textarea>
+                            <p class="text-xs text-gray-500 mt-1">Do not include names, phone numbers, or account details.</p>
                         </div>
-                        <button type="submit" class="w-full bg-navy text-white rounded-lg py-3 font-semibold hover:bg-gray-800 transition-colors focus:ring-4 focus:ring-gray-300">
-                            Submit Warning Report
-                        </button>
+                        <button type="submit" class="w-full bg-navy text-white rounded-lg py-3 font-semibold hover:bg-gray-800 transition-colors">Submit Warning Report</button>
                     </form>
+                    <p class="text-xs text-gray-500 mt-4">Been scammed? Report it to the FTC at ReportFraud.ftc.gov and the Illinois Attorney General's office.</p>
                 </div>
             </div>
         </section>
 
-        <section id="tab-simulator" class="tab-content hidden max-w-3xl mx-auto">
+        <!-- ============ TAB 3: SIMULATOR ============ -->
+        <section id="tab-simulator" role="tabpanel" aria-labelledby="btn-tab-simulator" class="tab-content hidden max-w-3xl mx-auto">
             <div class="text-center mb-8">
                 <h2 class="text-3xl font-bold text-navy">Practice Spotting Scams</h2>
-                <p class="mt-2 text-gray-600">Test your ability to spot modern AI deepfakes, spoofed calls, and sophisticated phishing attempts.</p>
+                <p class="mt-2 text-gray-600">Test your instincts against common phone, email, and text scams.</p>
             </div>
 
             <div id="quiz-container" class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                <!-- Progress Indicator -->
-                <div class="h-2 bg-gray-100 w-full">
-                    <div id="quiz-progress" class="h-2 bg-shieldBlue transition-all duration-300" style="width: 0%"></div>
-                </div>
-
+                <div class="h-2 bg-gray-100 w-full"><div id="quiz-progress" class="h-2 bg-shieldBlue transition-all duration-300" style="width: 0%"></div></div>
                 <div class="p-6 md:p-8">
                     <div id="quiz-question-area">
-                        <span id="quiz-step-badge" class="inline-block bg-blue-100 text-shieldBlue text-xs font-bold px-3 py-1 rounded-full mb-3">Scenario 1 of 3</span>
-                        <h3 id="quiz-scenario" class="text-xl font-bold text-navy mb-6">Loading Scenario...</h3>
-                        <div id="quiz-options" class="space-y-3">
-                            <!-- Dynamic Options -->
-                        </div>
+                        <span id="quiz-step-badge" class="inline-block bg-blue-100 text-shieldBlue text-xs font-bold px-3 py-1 rounded-full mb-3"></span>
+                        <h3 id="quiz-scenario" class="text-xl font-bold text-navy mb-6"></h3>
+                        <div id="quiz-options" class="space-y-3"></div>
                     </div>
 
-                    <!-- Feedback Panel -->
-                    <div id="quiz-feedback-area" class="hidden mt-6 pt-6 border-t border-gray-100">
+                    <div id="quiz-feedback-area" class="hidden mt-6 pt-6 border-t border-gray-100" aria-live="polite">
                         <div id="quiz-feedback-box" class="p-5 rounded-xl mb-6">
                             <h4 id="quiz-feedback-title" class="font-bold text-lg mb-2 flex items-center gap-2"></h4>
                             <p id="quiz-feedback-text" class="text-gray-700 leading-relaxed"></p>
                             <div class="mt-4 text-sm text-gray-600 bg-white/70 p-3 rounded-lg border border-gray-200">
-                                <strong>Consumer Defense Tip:</strong> <span id="quiz-feedback-law"></span>
+                                <strong>Defense Tip:</strong> <span id="quiz-feedback-law"></span>
                             </div>
                         </div>
-                        <button id="btn-next-question" class="w-full bg-navy text-white rounded-lg py-3 font-semibold hover:bg-gray-800 transition-colors">
-                            Next Scenario
-                        </button>
+                        <button id="btn-next-question" class="w-full bg-navy text-white rounded-lg py-3 font-semibold hover:bg-gray-800 transition-colors">Next Scenario</button>
                     </div>
 
-                    <!-- End Completion Panel -->
                     <div id="quiz-end-area" class="hidden text-center py-8">
                         <div class="w-16 h-16 bg-blue-100 text-shieldBlue rounded-full flex items-center justify-center mx-auto mb-4">
-                            <i data-lucide="award" class="w-10 h-10"></i>
+                            <i data-lucide="award" class="w-10 h-10" aria-hidden="true"></i>
                         </div>
                         <h3 class="text-2xl font-bold text-navy mb-2">Training Complete</h3>
-                        <p id="quiz-score-summary" class="text-gray-600 mb-6">You've sharpened your awareness against modern digital fraud.</p>
-                        <button id="btn-restart-quiz" class="bg-shieldBlue text-white px-6 py-3 rounded-full font-medium hover:bg-blue-700 transition-colors">
-                            Retake Simulator Training
-                        </button>
+                        <p id="quiz-score-summary" class="text-gray-600 mb-6"></p>
+                        <button id="btn-restart-quiz" class="bg-shieldBlue text-white px-6 py-3 rounded-full font-medium hover:bg-blue-700 transition-colors">Retake Training</button>
                     </div>
                 </div>
             </div>
         </section>
-
     </main>
 
     <footer class="bg-white border-t border-gray-200 mt-auto py-6">
         <div class="max-w-6xl mx-auto px-4 text-center text-gray-500 text-sm">
-            <p>ID-Shield - Congressional App Challenge Submission (IL-11)</p>
-            <p class="mt-1">Designed for consumer awareness and educational defense.</p>
+            <p>ID-Shield &mdash; Congressional App Challenge Submission (IL-11)</p>
+            <p class="mt-1">Educational tool. Not a substitute for contacting your bank, carrier, or law enforcement.</p>
         </div>
     </footer>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // Initialize Lucide icons on load
-            lucide.createIcons();
+    document.addEventListener('DOMContentLoaded', () => {
+        lucide.createIcons();
 
-            function showNotification(type, message) {
-                const container = document.getElementById('notification-container');
-                const toast = document.createElement('div');
-                
-                const colors = {
-                    error: 'bg-red-50 border-red-200 text-red-800',
-                    success: 'bg-green-50 border-green-200 text-green-800',
-                    info: 'bg-blue-50 border-blue-200 text-blue-800'
-                };
-                const icons = {
-                    error: 'alert-circle',
-                    success: 'check-circle-2',
-                    info: 'info'
-                };
+        /* ---------- helpers ---------- */
+        // Escape any user-provided text before it touches innerHTML (prevents XSS).
+        function esc(s) {
+            return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+        function safeStorageGet(key, fallback) {
+            try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+        }
+        function safeStorageSet(key, value) {
+            try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private mode / quota */ }
+        }
+        function timeAgo(ts) {
+            const mins = Math.round((Date.now() - ts) / 60000);
+            if (mins < 1) return 'Just now';
+            if (mins < 60) return `${mins} min ago`;
+            const hrs = Math.round(mins / 60);
+            if (hrs < 24) return `${hrs} hour${hrs === 1 ? '' : 's'} ago`;
+            const days = Math.round(hrs / 24);
+            return `${days} day${days === 1 ? '' : 's'} ago`;
+        }
 
-                toast.className = `flex items-center gap-3 p-4 rounded-xl shadow-lg border pointer-events-auto transition-all duration-300 transform translate-y-[-1rem] opacity-0 ${colors[type]}`;
-                toast.innerHTML = `
-                    <i data-lucide="${icons[type]}" class="w-5 h-5 flex-shrink-0"></i>
-                    <p class="font-medium text-sm">${message}</p>
-                `;
+        function showNotification(type, message) {
+            const container = document.getElementById('notification-container');
+            const toast = document.createElement('div');
+            const colors = { error: 'bg-red-50 border-red-200 text-red-800', success: 'bg-green-50 border-green-200 text-green-800', info: 'bg-blue-50 border-blue-200 text-blue-800' };
+            const icons = { error: 'alert-circle', success: 'check-circle-2', info: 'info' };
+            toast.className = `flex items-center gap-3 p-4 rounded-xl shadow-lg border pointer-events-auto transition-all duration-300 transform translate-y-[-1rem] opacity-0 ${colors[type]}`;
+            toast.innerHTML = `<i data-lucide="${icons[type]}" class="w-5 h-5 flex-shrink-0"></i><p class="font-medium text-sm"></p>`;
+            toast.querySelector('p').textContent = message;
+            container.appendChild(toast);
+            lucide.createIcons({ root: toast });
+            requestAnimationFrame(() => toast.classList.remove('translate-y-[-1rem]', 'opacity-0'));
+            setTimeout(() => {
+                toast.classList.add('translate-y-[-1rem]', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 4500);
+        }
 
-                container.appendChild(toast);
-                lucide.createIcons({ root: toast });
+        /* ---------- tabs ---------- */
+        const tabButtons = document.querySelectorAll('#nav-tabs [role="tab"]');
+        const tabContents = document.querySelectorAll('.tab-content');
+        let mapReady = false;
 
-                requestAnimationFrame(() => {
-                    toast.classList.remove('translate-y-[-1rem]', 'opacity-0');
-                });
+        function activateTab(button) {
+            tabButtons.forEach(btn => {
+                const on = btn === button;
+                btn.classList.toggle('tab-active', on);
+                btn.classList.toggle('tab-inactive', !on);
+                btn.setAttribute('aria-selected', on ? 'true' : 'false');
+            });
+            const targetId = button.dataset.target;
+            tabContents.forEach(c => c.classList.toggle('hidden', c.id !== targetId));
+            if (targetId === 'tab-map') {
+                if (!mapReady) { initMap(); mapReady = true; }
+                else if (appMap) appMap.invalidateSize();
+            }
+        }
+        tabButtons.forEach(b => b.addEventListener('click', () => activateTab(b)));
 
-                setTimeout(() => {
-                    toast.classList.add('translate-y-[-1rem]', 'opacity-0');
-                    setTimeout(() => toast.remove(), 300);
-                }, 4000);
+        /* ---------- audio upload ---------- */
+        const MAX_BYTES = 25 * 1024 * 1024;
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('audio-input');
+        const overlay = document.getElementById('processing-overlay');
+        const resultsUI = document.getElementById('analysis-results');
+        const audioPreview = document.getElementById('audio-preview');
+        let previewUrl = null;
+        let busy = false;
+
+        // Only stop the browser from navigating away when a file is dropped outside the zone.
+        ['dragover', 'drop'].forEach(ev => window.addEventListener(ev, e => e.preventDefault()));
+
+        dropzone.addEventListener('click', () => { if (!busy) fileInput.click(); });
+        dropzone.addEventListener('keydown', e => {
+            if ((e.key === 'Enter' || e.key === ' ') && !busy) { e.preventDefault(); fileInput.click(); }
+        });
+        dropzone.addEventListener('dragenter', () => dropzone.classList.add('dropzone-active'));
+        dropzone.addEventListener('dragover', () => dropzone.classList.add('dropzone-active'));
+        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dropzone-active'));
+        dropzone.addEventListener('drop', e => {
+            dropzone.classList.remove('dropzone-active');
+            const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (f) handleAudioFile(f);
+        });
+        fileInput.addEventListener('change', e => {
+            const f = e.target.files && e.target.files[0];
+            if (f) handleAudioFile(f);
+        });
+
+        document.getElementById('btn-reset-audio').addEventListener('click', () => {
+            resultsUI.classList.add('hidden');
+            dropzone.classList.remove('hidden');
+            fileInput.value = '';
+            audioPreview.pause();
+            if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
+            audioPreview.removeAttribute('src');
+        });
+
+        async function handleAudioFile(file) {
+            if (busy) return;
+            if (!file.type.startsWith('audio/') && !/\.(mp3|wav|m4a|aac|ogg)$/i.test(file.name)) {
+                showNotification('error', 'Please upload an audio file (.mp3, .wav, .m4a, .aac, or .ogg).');
+                return;
+            }
+            if (file.size > MAX_BYTES) {
+                showNotification('error', 'That file is over 25 MB. Please upload a shorter clip.');
+                return;
             }
 
-            const tabButtons = document.querySelectorAll('#nav-tabs button');
-            const tabContents = document.querySelectorAll('.tab-content');
-            let isMapInitialized = false;
+            busy = true;
+            overlay.classList.remove('hidden');
+            let audioCtx = null;
+            try {
+                if (previewUrl) URL.revokeObjectURL(previewUrl);
+                previewUrl = URL.createObjectURL(file);
+                audioPreview.src = previewUrl;
 
-            tabButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    tabButtons.forEach(btn => {
-                        btn.classList.remove('tab-active');
-                        btn.classList.add('tab-inactive');
-                    });
-                    button.classList.add('tab-active');
-                    button.classList.remove('tab-inactive');
+                // Let the spinner paint before the heavy synchronous work starts.
+                await new Promise(r => setTimeout(r, 50));
 
-                    const targetId = button.getAttribute('data-target');
-                    tabContents.forEach(content => {
-                        content.classList.add('hidden');
-                        if (content.id === targetId) {
-                            content.classList.remove('hidden');
-                        }
-                    });
+                const arrayBuffer = await file.arrayBuffer();
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                const analysis = analyzeAudioBuffer(audioBuffer);
+                renderAudioResults(analysis);
+            } catch (error) {
+                console.error('Audio processing error:', error);
+                showNotification('error', 'Could not read that audio. Try a standard MP3 or WAV file.');
+            } finally {
+                if (audioCtx && audioCtx.state !== 'closed') audioCtx.close().catch(() => {});
+                overlay.classList.add('hidden');
+                busy = false;
+            }
+        }
 
-                    if (targetId === 'tab-map') {
-                        if (!isMapInitialized) {
-                            initMap();
-                            isMapInitialized = true;
-                        } else if (appMap) {
-                            appMap.invalidateSize();
-                        }
+        /* ---------- signal analysis ----------
+         * HONEST SCOPE: these are generic acoustic statistics. They have NOT been
+         * validated against labelled real/synthetic speech, so they cannot reliably
+         * detect AI voices. The UI says so, and the result is a "signal level",
+         * not a probability. Replace with a trained anti-spoofing model to claim detection.
+         */
+        function emptyFeatures() {
+            return { spectralEntropy: 0, spectralFlatness: 0, energyVariability: 0, voicedRatio: 0, harmonicity: 0, analyzedFrames: 0 };
+        }
+
+        function analyzeAudioBuffer(audioBuffer) {
+            const length = audioBuffer.length;
+            const channels = audioBuffer.numberOfChannels;
+            const mono = new Float32Array(length);
+            for (let ch = 0; ch < channels; ch++) {
+                const data = audioBuffer.getChannelData(ch);
+                for (let i = 0; i < length; i++) mono[i] += data[i] / channels;
+            }
+
+            let mean = 0;
+            for (let i = 0; i < length; i++) mean += mono[i];
+            mean /= Math.max(1, length);
+            let peak = 0;
+            for (let i = 0; i < length; i++) {
+                mono[i] -= mean;
+                const a = Math.abs(mono[i]);
+                if (a > peak) peak = a;
+            }
+            if (!Number.isFinite(peak) || peak < 1e-4) return evaluateMetrics(emptyFeatures());
+
+            const gain = Math.min(8, 0.9 / peak);
+            for (let i = 0; i < length; i++) mono[i] *= gain;
+
+            const sampleRate = audioBuffer.sampleRate;
+            const fftSize = 1024;
+            const hopSize = 512;
+            const minSpeechHz = 70;
+            const maxSpeechHz = Math.min(8000, sampleRate / 2 - 1);
+
+            const totalFrames = Math.max(0, Math.floor((length - fftSize) / hopSize) + 1);
+            const frameStep = Math.max(1, Math.ceil(totalFrames / 150));
+
+            const window_ = new Float64Array(fftSize);
+            for (let i = 0; i < fftSize; i++) window_[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (fftSize - 1));
+
+            const minLag = Math.max(1, Math.floor(sampleRate / 450));
+            const maxLag = Math.min(fftSize - 1, Math.floor(sampleRate / 70));
+
+            let sumEntropy = 0, sumFlatness = 0, sumHarm = 0, voicedCount = 0, n = 0;
+            const energies = [];
+            const real = new Float64Array(fftSize);
+            const imag = new Float64Array(fftSize);
+
+            for (let f = 0; f < totalFrames; f += frameStep) {
+                const start = f * hopSize;
+
+                let rms = 0;
+                for (let i = 0; i < fftSize; i++) { const x = mono[start + i]; rms += x * x; }
+                rms = Math.sqrt(rms / fftSize);
+                if (rms < 0.012) continue; // silence
+
+                for (let i = 0; i < fftSize; i++) { real[i] = mono[start + i] * window_[i]; imag[i] = 0; }
+                fft(real, imag);
+
+                const bins = [];
+                let powerSum = 0, logSum = 0, wFreq = 0;
+                for (let k = 1; k < fftSize / 2; k++) {
+                    const freq = (k * sampleRate) / fftSize;
+                    if (freq < minSpeechHz || freq > maxSpeechHz) continue;
+                    const p = real[k] * real[k] + imag[k] * imag[k];
+                    bins.push(p);
+                    powerSum += p;
+                    logSum += Math.log(Math.max(p, 1e-16));
+                    wFreq += freq * p;
+                }
+                if (powerSum <= 0 || bins.length === 0) continue;
+
+                let entropy = 0;
+                for (const p of bins) {
+                    if (p <= 0) continue;
+                    const pr = p / powerSum;
+                    entropy -= pr * Math.log2(pr);
+                }
+                const normEntropy = entropy / Math.log2(bins.length);
+                const flatness = Math.min(1, Math.exp(logSum / bins.length) / (powerSum / bins.length));
+                const centroid = wFreq / powerSum;
+
+                // Normalized autocorrelation → periodicity
+                let framePower = 0;
+                for (let i = 0; i < fftSize; i++) framePower += mono[start + i] * mono[start + i];
+                let best = 0;
+                if (framePower > 1e-8) {
+                    for (let lag = minLag; lag <= maxLag; lag += 2) {
+                        let corr = 0;
+                        const usable = fftSize - lag;
+                        for (let i = 0; i < usable; i++) corr += mono[start + i] * mono[start + i + lag];
+                        corr = (corr / usable) / (framePower / fftSize);
+                        if (corr > best) best = corr;
                     }
-                });
-            });
-
-            const dropzone = document.getElementById('dropzone');
-            const fileInput = document.getElementById('audio-input');
-            const overlay = document.getElementById('processing-overlay');
-            const resultsUI = document.getElementById('analysis-results');
-
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                document.body.addEventListener(eventName, (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                }, false);
-            });
-
-            dropzone.addEventListener('click', (e) => {
-                if (e.target === fileInput) return;
-                fileInput.click();
-            });
-
-            dropzone.addEventListener('dragenter', () => dropzone.classList.add('dropzone-active'));
-            dropzone.addEventListener('dragover', () => dropzone.classList.add('dropzone-active'));
-            dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dropzone-active'));
-
-            dropzone.addEventListener('drop', (e) => {
-                dropzone.classList.remove('dropzone-active');
-                if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                    handleAudioFile(e.dataTransfer.files[0]);
                 }
-            });
+                const harmonicity = Math.max(0, Math.min(1, best));
 
-            fileInput.addEventListener('change', (e) => {
-                if (e.target.files && e.target.files.length > 0) {
-                    handleAudioFile(e.target.files[0]);
+                if (harmonicity > 0.28 && centroid > 90 && centroid < Math.min(4200, sampleRate / 2)) voicedCount++;
+
+                sumEntropy += normEntropy;
+                sumFlatness += flatness;
+                sumHarm += harmonicity;
+                energies.push(rms);
+                n++;
+            }
+
+            if (n === 0) return evaluateMetrics(emptyFeatures());
+
+            const sorted = [...energies].sort((a, b) => a - b);
+            const median = sorted[Math.floor(sorted.length / 2)] || 0;
+            const devs = energies.map(v => Math.abs(v - median)).sort((a, b) => a - b);
+            const mad = devs[Math.floor(devs.length / 2)] || 0;
+
+            return evaluateMetrics({
+                spectralEntropy: sumEntropy / n,
+                spectralFlatness: sumFlatness / n,
+                energyVariability: median > 0 ? Math.min(1, (mad / median) * 4) : 0,
+                voicedRatio: voicedCount / n,
+                harmonicity: sumHarm / n,
+                analyzedFrames: n
+            });
+        }
+
+        function fft(real, imag) {
+            const n = real.length;
+            for (let i = 1, j = 0; i < n; i++) {
+                let bit = n >> 1;
+                for (; j & bit; bit >>= 1) j ^= bit;
+                j ^= bit;
+                if (i < j) {
+                    [real[i], real[j]] = [real[j], real[i]];
+                    [imag[i], imag[j]] = [imag[j], imag[i]];
                 }
+            }
+            for (let len = 2; len <= n; len <<= 1) {
+                const half = len >> 1;
+                const theta = -2 * Math.PI / len;
+                const wlr = Math.cos(theta), wli = Math.sin(theta);
+                for (let i = 0; i < n; i += len) {
+                    let wr = 1, wi = 0;
+                    for (let j = 0; j < half; j++) {
+                        const e = i + j, o = e + half;
+                        const or = real[o] * wr - imag[o] * wi;
+                        const oi = real[o] * wi + imag[o] * wr;
+                        real[o] = real[e] - or; imag[o] = imag[e] - oi;
+                        real[e] += or;          imag[e] += oi;
+                        const nwr = wr * wlr - wi * wli;
+                        wi = wr * wli + wi * wlr;
+                        wr = nwr;
+                    }
+                }
+            }
+        }
+
+        function evaluateMetrics(f) {
+            const baseActions = [
+                'Never send money, gift cards, crypto, passwords, or verification codes because of a phone call.',
+                'Hang up and call the person or organization back on a number you already trust (saved contact, back of your card).',
+                'Agree on a family "safe word" now. A real relative can say it; a cloned voice can’t.'
+            ];
+
+            if (f.analyzedFrames < 5) {
+                return {
+                    level: 'Inconclusive',
+                    flags: ['Not enough usable speech was found. The clip may be too short, too quiet, or mostly silence.'],
+                    actions: ['Upload a clearer clip with at least several seconds of speech. Treat this as no information.', ...baseActions],
+                    entropy: '--', flatness: '--', dynamics: '--', voiced: '--'
+                };
+            }
+
+            let points = 0;
+            const flags = [];
+            if (f.spectralEntropy < 0.52) { points += 2; flags.push('Speech spectrum is unusually concentrated.'); }
+            else if (f.spectralEntropy < 0.62) { points += 1; flags.push('Speech spectrum is somewhat more uniform than typical.'); }
+
+            if (f.spectralFlatness < 0.08) { points += 1; flags.push('Very tonal, structured signal (low spectral flatness).'); }
+
+            if (f.energyVariability < 0.08) { points += 2; flags.push('Loudness changes very little across the clip.'); }
+            else if (f.energyVariability < 0.14) { points += 1; flags.push('Loudness variation is limited.'); }
+
+            if (f.harmonicity > 0.82 && f.voicedRatio > 0.55) { points += 1; flags.push('Voice is unusually steady and periodic.'); }
+
+            let level;
+            if (f.voicedRatio < 0.30) {
+                level = 'Inconclusive';
+                flags.push('Little clearly voiced speech was found, so the numbers aren’t meaningful.');
+            } else if (points >= 4) level = 'Unusual';
+            else if (points >= 2) level = 'Slightly unusual';
+            else level = 'Typical';
+
+            if (flags.length === 0) flags.push('Nothing stood out in these basic measurements. This does NOT mean the voice is real.');
+
+            const lead = {
+                'Unusual': 'Several unusual audio properties were found. Verify the caller through a second channel before acting.',
+                'Slightly unusual': 'A couple of properties were unusual. This alone means little. Verify before acting on any request.',
+                'Typical': 'Nothing unusual in these basic measurements. Modern voice clones can look typical, so still verify.',
+                'Inconclusive': 'The screen could not assess this recording. Use independent verification.'
+            }[level];
+
+            return {
+                level, flags, actions: [lead, ...baseActions],
+                entropy: f.spectralEntropy.toFixed(3),
+                flatness: f.spectralFlatness.toFixed(3),
+                dynamics: (f.energyVariability * 100).toFixed(1) + ' %',
+                voiced: (f.voicedRatio * 100).toFixed(1) + ' %'
+            };
+        }
+
+        function renderAudioResults(data) {
+            dropzone.classList.add('hidden');
+            resultsUI.classList.remove('hidden');
+
+            const styles = {
+                'Unusual':          ['bg-red-100 text-red-800', 'alert-octagon', 'Unusual Signal'],
+                'Slightly unusual': ['bg-amber-100 text-amber-800', 'alert-triangle', 'Slightly Unusual'],
+                'Typical':          ['bg-slate-100 text-slate-700', 'activity', 'Nothing Unusual Found'],
+                'Inconclusive':     ['bg-gray-100 text-gray-700', 'help-circle', 'Inconclusive']
+            };
+            const [cls, icon, label] = styles[data.level];
+            const badge = document.getElementById('res-badge');
+            badge.className = `inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-lg w-max ${cls}`;
+            badge.innerHTML = `<i data-lucide="${icon}" class="w-6 h-6"></i><span>${label}</span>`;
+
+            const flagsList = document.getElementById('res-flags');
+            flagsList.innerHTML = '';
+            data.flags.forEach(t => {
+                const li = document.createElement('li');
+                li.className = 'flex items-start gap-2 text-sm text-gray-700';
+                li.innerHTML = '<i data-lucide="chevron-right" class="w-4 h-4 text-alertOrange flex-shrink-0 mt-0.5"></i><span></span>';
+                li.querySelector('span').textContent = t;
+                flagsList.appendChild(li);
             });
 
-            document.getElementById('btn-reset-audio').addEventListener('click', () => {
-                resultsUI.classList.add('hidden');
-                dropzone.classList.remove('hidden');
-                fileInput.value = '';
+            const actions = document.getElementById('res-actions');
+            actions.innerHTML = '';
+            data.actions.forEach((t, i) => {
+                const p = document.createElement('p');
+                p.className = 'text-sm text-slate-800 flex items-start gap-2' + (i === 0 ? ' font-semibold' : '');
+                p.innerHTML = '<i data-lucide="arrow-right" class="w-4 h-4 text-shieldBlue flex-shrink-0 mt-0.5"></i><span></span>';
+                p.querySelector('span').textContent = t;
+                actions.appendChild(p);
             });
 
-            async function handleAudioFile(file) {
-                if (!file.type.startsWith('audio/') && !file.name.match(/\.(mp3|wav|m4a|aac|ogg)$/i)) {
-                    showNotification('error', 'Please upload a valid audio file (.mp3, .wav, .m4a, .aac, or .ogg).');
+            document.getElementById('res-entropy').textContent = data.entropy;
+            document.getElementById('res-flatness').textContent = data.flatness;
+            document.getElementById('res-dynamics').textContent = data.dynamics;
+            document.getElementById('res-voiced').textContent = data.voiced;
+            lucide.createIcons({ root: resultsUI });
+        }
+
+        /* ---------- threat map (Supabase-backed) ---------- */
+        // 1) Supabase Dashboard -> Project Settings -> API: paste the Project URL and the
+        //    publishable (anon) key below. These are safe to ship in the browser ONLY because
+        //    Row Level Security (see supabase/schema.sql) restricts what they can do.
+        // 2) NEVER paste the service_role / secret key here.
+        const SUPABASE_URL = 'https://ygnrfhvkmvmedswlbigo.supabase.co';        // e.g. https://abcdxyz.supabase.co
+        const SUPABASE_KEY = 'sb_publishable_9CPQAqSRP_Hi9q5lFy2g7A_fdTBQUGR';
+
+        const sb = (window.supabase && !SUPABASE_URL.startsWith('YOUR_'))
+            ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+            : null;
+
+        // Coordinates live in the app, not the database, so visitors can't store arbitrary locations.
+        const CITY_COORDS = {
+            'Aurora': [41.7606, -88.3201], 'Naperville': [41.7508, -88.1535], 'Bolingbrook': [41.6986, -88.0684],
+            'Joliet': [41.5250, -88.0817], 'Elgin': [42.0354, -88.2826]
+        };
+        const REPORT_COOLDOWN_MS = 30000;
+        let appMap = null;
+        let reportLayer = null;
+
+        const H = 3600 * 1000;
+        const sampleReports = [
+            { city: 'Aurora',     type: 'AI Voice Cloning', desc: 'Caller used a cloned voice claiming a family member needed immediate bail money.', ts: Date.now() - 2 * H,  sample: true },
+            { city: 'Naperville', type: 'Impersonation',    desc: 'Fake call claiming to be the electric company demanding gift cards for unpaid bills.', ts: Date.now() - 5 * H,  sample: true },
+            { city: 'Joliet',     type: 'Phishing Text',    desc: 'Text about an unpaid toll balance with a suspicious link.', ts: Date.now() - 26 * H, sample: true },
+            { city: 'Elgin',      type: 'Utility Scam',     desc: 'Automated call threatening water shut-off within 30 minutes.', ts: Date.now() - 30 * H, sample: true }
+        ];
+
+        document.getElementById('map-intro').innerHTML = sb
+            ? 'Reports are shared live with everyone using ID-Shield. Pins are placed at town level, not at an exact address.'
+            : '<strong>Offline demo mode:</strong> Supabase isn&rsquo;t configured, so entries marked <em>Sample</em> are examples and reports you add stay on this device only.';
+
+        async function loadReports() {
+            if (!sb) {
+                return [...sampleReports, ...safeStorageGet('idshield.reports.v1', [])];
+            }
+            const { data, error } = await sb.from('scam_reports')
+                .select('id,type,city,description,created_at')
+                .order('created_at', { ascending: false })
+                .limit(100);
+            if (error) {
+                console.error('Supabase load error:', error);
+                showNotification('error', 'Could not load shared reports. Please try again later.');
+                return [];
+            }
+            return data.map(r => ({ city: r.city, type: r.type, desc: r.description, ts: new Date(r.created_at).getTime() }));
+        }
+
+        async function saveReport(report) {
+            if (!sb) {
+                const all = safeStorageGet('idshield.reports.v1', []);
+                all.push(report);
+                safeStorageSet('idshield.reports.v1', all.slice(-100));
+                return null;
+            }
+            const { error } = await sb.from('scam_reports')
+                .insert({ type: report.type, city: report.city, description: report.desc });
+            return error;
+        }
+
+        async function initMap() {
+            appMap = L.map('map-container').setView([41.7606, -88.25], 10);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 18, attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(appMap);
+            reportLayer = L.layerGroup().addTo(appMap);
+
+            const reports = await loadReports();
+            // Oldest first so prepend() leaves the newest at the top of the feed.
+            reports.sort((a, b) => a.ts - b.ts).forEach(r => addReport(r, false));
+
+            const form = document.getElementById('report-form');
+            const submitBtn = form.querySelector('button[type=submit]');
+            form.addEventListener('submit', async e => {
+                e.preventDefault();
+                const type = document.getElementById('report-type').value;
+                const city = document.getElementById('report-city').value;
+                const desc = document.getElementById('report-desc').value.trim();
+
+                if (!type || !city || !CITY_COORDS[city]) { showNotification('error', 'Please choose a scam type and a city.'); return; }
+                if (desc.length < 10 || desc.length > 300) { showNotification('error', 'Description must be 10 to 300 characters.'); return; }
+
+                // Basic client-side throttle. This is a courtesy, not security: real abuse
+                // protection must live server-side (see notes).
+                let last = 0;
+                try { last = Number(localStorage.getItem('idshield.lastReport')) || 0; } catch {}
+                if (Date.now() - last < REPORT_COOLDOWN_MS) {
+                    showNotification('info', 'Please wait a moment before sending another report.');
                     return;
                 }
 
-                const previewUrl = URL.createObjectURL(file);
-                document.getElementById('audio-preview').src = previewUrl;
-                overlay.classList.remove('hidden');
+                submitBtn.disabled = true;
+                const report = { city, type, desc, ts: Date.now() };
+                const error = await saveReport(report);
+                submitBtn.disabled = false;
 
-                try {
-                    const arrayBuffer = await file.arrayBuffer();
-                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                    
-                    const audioBuffer = await new Promise((resolve, reject) => {
-                        audioCtx.decodeAudioData(arrayBuffer, resolve, reject);
-                    });
-
-                    const analysis = await processAudioBuffer(audioBuffer);
-                    renderAudioResults(analysis);
-                    await audioCtx.close();
-                } catch (error) {
-                    console.error("Audio processing error:", error);
-                    showNotification('error', 'Unable to parse audio format. Try uploading a standard MP3 or WAV file.');
-                } finally {
-                    overlay.classList.add('hidden');
+                if (error) {
+                    console.error('Supabase insert error:', error);
+                    showNotification('error', 'Could not submit your report. Please try again.');
+                    return;
                 }
-            }
-
-            /*
-             * Browser-side AI voice screening
-             * --------------------------------
-             * The old implementation tried to estimate an FFT with a hand-written
-             * DFT but multiplied the angular step by the sample index incorrectly.
-             * That made the "spectral entropy" value unreliable.
-             *
-             * This version:
-             *   1. Mixes stereo audio to mono.
-             *   2. Resamples conceptually through fixed-size analysis windows.
-             *   3. Uses a real radix-2 FFT for every sampled frame.
-             *   4. Measures speech-band spectral entropy + flatness.
-             *   5. Measures short-term energy variation and voiced-frame ratio.
-             *   6. Combines the features into a bounded screening score.
-             *
-             * It is intentionally presented as a heuristic screen. A reliable
-             * forensic detector requires a trained anti-spoofing ML model and
-             * validation data; acoustic rules alone cannot prove a voice is AI.
-             */
-
-            async function processAudioBuffer(audioBuffer) {
-                // Mix all available channels to mono so the detector does not
-                // silently ignore the right channel of stereo recordings.
-                const length = audioBuffer.length;
-                const channels = audioBuffer.numberOfChannels;
-                const mono = new Float32Array(length);
-
-                if (channels === 1) {
-                    mono.set(audioBuffer.getChannelData(0));
-                } else {
-                    for (let ch = 0; ch < channels; ch++) {
-                        const data = audioBuffer.getChannelData(ch);
-                        for (let i = 0; i < length; i++) {
-                            mono[i] += data[i] / channels;
-                        }
-                    }
-                }
-
-                // Remove DC offset and find the peak for a stable analysis level.
-                let mean = 0;
-                for (let i = 0; i < mono.length; i++) mean += mono[i];
-                mean /= Math.max(1, mono.length);
-
-                let peak = 0;
-                for (let i = 0; i < mono.length; i++) {
-                    mono[i] -= mean;
-                    peak = Math.max(peak, Math.abs(mono[i]));
-                }
-
-                if (!Number.isFinite(peak) || peak < 1e-4) {
-                    return evaluateMetrics({
-                        spectralEntropy: 0,
-                        spectralFlatness: 0,
-                        energyVariability: 0,
-                        voicedRatio: 0,
-                        harmonicity: 0,
-                        analyzedFrames: 0
-                    });
-                }
-
-                // Normalize only enough to make thresholds independent of file gain.
-                const gain = Math.min(8, 0.9 / peak);
-                for (let i = 0; i < mono.length; i++) mono[i] *= gain;
-
-                const sampleRate = audioBuffer.sampleRate;
-                const fftSize = 1024;
-                const hopSize = 512;
-                const minSpeechHz = 70;
-                const maxSpeechHz = Math.min(8000, sampleRate / 2 - 1);
-
-                const frames = [];
-                const totalFrames = Math.max(0, Math.floor((mono.length - fftSize) / hopSize) + 1);
-
-                // Sampling at most ~100 frames keeps processing responsive in the browser.
-                const frameStep = Math.max(1, Math.ceil(totalFrames / 100));
-
-                let sumEntropy = 0;
-                let sumFlatness = 0;
-                let voicedCount = 0;
-                let harmonicitySum = 0;
-                const frameEnergies = [];
-
-                for (let frameIndex = 0; frameIndex < totalFrames; frameIndex += frameStep) {
-                    const start = frameIndex * hopSize;
-
-                    let rms = 0;
-                    for (let i = 0; i < fftSize; i++) {
-                        const x = mono[start + i] || 0;
-                        rms += x * x;
-                    }
-                    rms = Math.sqrt(rms / fftSize);
-
-                    // Ignore silence / room-floor frames.
-                    if (rms < 0.012) continue;
-
-                    const real = new Float64Array(fftSize);
-                    const imag = new Float64Array(fftSize);
-
-                    // Hann window reduces spectral leakage.
-                    for (let i = 0; i < fftSize; i++) {
-                        const x = mono[start + i] || 0;
-                        const window = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (fftSize - 1));
-                        real[i] = x * window;
-                    }
-
-                    fft(real, imag);
-
-                    const power = new Float64Array(fftSize / 2);
-                    let powerSum = 0;
-                    let geometricLogSum = 0;
-                    let binsUsed = 0;
-                    let weightedFreq = 0;
-                    let weightedPower = 0;
-
-                    for (let k = 1; k < fftSize / 2; k++) {
-                        const frequency = (k * sampleRate) / fftSize;
-                        if (frequency < minSpeechHz || frequency > maxSpeechHz) continue;
-
-                        const p = real[k] * real[k] + imag[k] * imag[k];
-                        const safeP = Math.max(p, 1e-16);
-
-                        power[k] = p;
-                        powerSum += p;
-                        geometricLogSum += Math.log(safeP);
-                        binsUsed++;
-
-                        weightedFreq += frequency * p;
-                        weightedPower += p;
-                    }
-
-                    if (powerSum <= 0 || binsUsed === 0) continue;
-
-                    let entropy = 0;
-                    let arithmeticMean = 0;
-                    for (let k = 1; k < fftSize / 2; k++) {
-                        const p = power[k];
-                        if (p <= 0) continue;
-                        arithmeticMean += p;
-
-                        const probability = p / powerSum;
-                        entropy -= probability * Math.log2(probability);
-                    }
-
-                    // Normalize entropy so 0..1 is comparable across recordings.
-                    const maxEntropy = Math.log2(binsUsed);
-                    const normalizedEntropy = maxEntropy > 0 ? entropy / maxEntropy : 0;
-
-                    // Spectral flatness: geometric mean / arithmetic mean.
-                    const geometricMean = Math.exp(geometricLogSum / binsUsed);
-                    const arithmeticMeanSafe = arithmeticMean / binsUsed;
-                    const flatness = arithmeticMeanSafe > 0
-                        ? Math.min(1, geometricMean / arithmeticMeanSafe)
-                        : 0;
-
-                    // Simple autocorrelation-based periodicity / harmonicity.
-                    // This is intentionally conservative because human speech also
-                    // has strong periodic structure.
-                    let harmonicity = 0;
-                    const minLag = Math.max(1, Math.floor(sampleRate / 450));
-                    const maxLag = Math.min(fftSize - 1, Math.floor(sampleRate / 70));
-                    let bestCorr = 0;
-
-                    let framePower = 0;
-                    for (let i = 0; i < fftSize; i++) {
-                        const x = mono[start + i] || 0;
-                        framePower += x * x;
-                    }
-
-                    if (framePower > 1e-8) {
-                        for (let lag = minLag; lag <= maxLag; lag += 2) {
-                            let corr = 0;
-                            const usable = fftSize - lag;
-                            for (let i = 0; i < usable; i++) {
-                                corr += (mono[start + i] || 0) * (mono[start + i + lag] || 0);
-                            }
-                            corr /= Math.max(1, usable);
-                            corr /= (framePower / fftSize);
-                            if (corr > bestCorr) bestCorr = corr;
-                        }
-                        harmonicity = Math.max(0, Math.min(1, bestCorr));
-                    }
-
-                    sumEntropy += normalizedEntropy;
-                    sumFlatness += flatness;
-                    harmonicitySum += harmonicity;
-                    frameEnergies.push(rms);
-
-                    // Use multiple acoustic cues for "voiced" instead of treating
-                    // every non-silent frame as speech.
-                    const centroid = weightedPower > 0 ? weightedFreq / weightedPower : 0;
-                    const looksVoiced =
-                        harmonicity > 0.28 &&
-                        centroid > 90 &&
-                        centroid < Math.min(4200, sampleRate / 2);
-
-                    if (looksVoiced) voicedCount++;
-
-                    frames.push({
-                        entropy: normalizedEntropy,
-                        flatness,
-                        harmonicity
-                    });
-                }
-
-                if (frames.length === 0) {
-                    return evaluateMetrics({
-                        spectralEntropy: 0,
-                        spectralFlatness: 0,
-                        energyVariability: 0,
-                        voicedRatio: 0,
-                        harmonicity: 0,
-                        analyzedFrames: 0
-                    });
-                }
-
-                const avgEntropy = sumEntropy / frames.length;
-                const avgFlatness = sumFlatness / frames.length;
-                const avgHarmonicity = harmonicitySum / frames.length;
-                const voicedRatio = voicedCount / frames.length;
-
-                // Robust energy variability. Median-relative MAD is less sensitive
-                // to a single loud word or click than a raw standard deviation.
-                const energySorted = [...frameEnergies].sort((a, b) => a - b);
-                const median = energySorted[Math.floor(energySorted.length / 2)] || 0;
-                const deviations = frameEnergies
-                    .map(v => Math.abs(v - median))
-                    .sort((a, b) => a - b);
-                const mad = deviations[Math.floor(deviations.length / 2)] || 0;
-                const energyVariability = median > 0 ? Math.min(1, (mad / median) * 4) : 0;
-
-                return evaluateMetrics({
-                    spectralEntropy: avgEntropy,
-                    spectralFlatness: avgFlatness,
-                    energyVariability,
-                    voicedRatio,
-                    harmonicity: avgHarmonicity,
-                    analyzedFrames: frames.length
-                });
-            }
-
-            function fft(real, imag) {
-                const n = real.length;
-
-                // Bit-reversal permutation.
-                for (let i = 1, j = 0; i < n; i++) {
-                    let bit = n >> 1;
-                    for (; j & bit; bit >>= 1) j ^= bit;
-                    j ^= bit;
-
-                    if (i < j) {
-                        [real[i], real[j]] = [real[j], real[i]];
-                        [imag[i], imag[j]] = [imag[j], imag[i]];
-                    }
-                }
-
-                // Iterative radix-2 Cooley-Tukey FFT.
-                for (let len = 2; len <= n; len <<= 1) {
-                    const half = len >> 1;
-                    const theta = -2 * Math.PI / len;
-                    const wLenReal = Math.cos(theta);
-                    const wLenImag = Math.sin(theta);
-
-                    for (let i = 0; i < n; i += len) {
-                        let wReal = 1;
-                        let wImag = 0;
-
-                        for (let j = 0; j < half; j++) {
-                            const even = i + j;
-                            const odd = even + half;
-
-                            const oddReal = real[odd] * wReal - imag[odd] * wImag;
-                            const oddImag = real[odd] * wImag + imag[odd] * wReal;
-
-                            real[odd] = real[even] - oddReal;
-                            imag[odd] = imag[even] - oddImag;
-                            real[even] += oddReal;
-                            imag[even] += oddImag;
-
-                            const nextWReal = wReal * wLenReal - wImag * wLenImag;
-                            wImag = wReal * wLenImag + wImag * wLenReal;
-                            wReal = nextWReal;
-                        }
-                    }
-                }
-            }
-
-            function evaluateMetrics(features) {
-                const {
-                    spectralEntropy,
-                    spectralFlatness,
-                    energyVariability,
-                    voicedRatio,
-                    harmonicity,
-                    analyzedFrames
-                } = features;
-
-                // Only score recordings with enough usable material.
-                if (analyzedFrames < 3) {
-                    return {
-                        risk: 'Unknown',
-                        score: 50,
-                        flags: [
-                            'Not enough usable speech was detected for a meaningful acoustic screen.'
-                        ],
-                        actions: [
-                            'Upload a clearer recording containing at least several seconds of speech.',
-                            'Treat this result as inconclusive rather than as evidence that the caller is authentic.'
-                        ],
-                        entropy: '--',
-                        flatness: '--',
-                        dynamics: '--',
-                        voiced: '--'
-                    };
-                }
-
-                /*
-                 * Heuristic score:
-                 * - Very low entropy + very low flatness can indicate an unusually
-                 *   structured signal.
-                 * - Very high flatness is suspicious for noise/compression, so it
-                 *   should not automatically mean "human".
-                 * - Extremely low energy variation can indicate synthetic smoothing.
-                 * - Very high harmonicity is NOT suspicious by itself, so it only
-                 *   contributes a small amount.
-                 * - A low voiced ratio lowers confidence in any AI conclusion.
-                 */
-                let suspicion = 0;
-                const flags = [];
-
-                if (spectralEntropy < 0.52) {
-                    suspicion += 20;
-                    flags.push('Unusually concentrated speech-band spectrum detected.');
-                } else if (spectralEntropy < 0.62) {
-                    suspicion += 8;
-                    flags.push('Speech spectrum is somewhat more uniform than expected.');
-                }
-
-                if (spectralFlatness < 0.08) {
-                    suspicion += 12;
-                    flags.push('Very low spectral flatness suggests a highly tonal/structured signal.');
-                }
-
-                if (energyVariability < 0.08) {
-                    suspicion += 18;
-                    flags.push('Speech energy changes very little across phrases.');
-                } else if (energyVariability < 0.14) {
-                    suspicion += 7;
-                    flags.push('Speech energy variation is relatively limited.');
-                }
-
-                if (voicedRatio < 0.30) {
-                    suspicion -= 12;
-                    flags.push('Too little clearly voiced speech was detected for a strong AI conclusion.');
-                }
-
-                if (harmonicity > 0.82 && voicedRatio > 0.55) {
-                    suspicion += 6;
-                    flags.push('Voice shows unusually persistent periodic structure.');
-                }
-
-                // Keep the score away from fake certainty.
-                suspicion = Math.max(0, Math.min(70, suspicion));
-
-                let risk;
-                let confidence;
-
-                if (voicedRatio < 0.30) {
-                    risk = 'Unknown';
-                    confidence = Math.max(55, Math.round(64 + voicedRatio * 15));
-                } else if (suspicion >= 42) {
-                    risk = 'High';
-                    confidence = Math.min(94, 72 + Math.round(suspicion * 0.45));
-                } else if (suspicion >= 23) {
-                    risk = 'Moderate';
-                    confidence = Math.min(88, 66 + Math.round(suspicion * 0.45));
-                } else {
-                    risk = 'Low';
-                    confidence = Math.min(86, 72 + Math.round((35 - suspicion) * 0.25));
-                }
-
-                if (risk === 'Low') {
-                    flags.push('Acoustic profile is more consistent with ordinary human speech than the synthetic patterns screened for.');
-                } else if (risk === 'Unknown') {
-                    flags.push('The recording should be treated as inconclusive.');
-                }
-
-                const actions = [
-                    'Never send money, gift cards, passwords, or verification codes based only on a phone call.',
-                    'Hang up and call the person or organization back using a number you already trust.'
-                ];
-
-                if (risk === 'High') {
-                    actions.unshift('<strong>CAUTION:</strong> Multiple acoustic anomalies were detected. Verify the caller through a second channel before taking action.');
-                } else if (risk === 'Moderate') {
-                    actions.unshift('Proceed with caution. The recording contains some synthetic-speech-like acoustic patterns, but the detector cannot confirm an AI voice.');
-                } else if (risk === 'Unknown') {
-                    actions.unshift('The detector could not confidently classify this recording. Use independent identity verification.');
-                }
-
-                return {
-                    risk,
-                    score: confidence,
-                    flags,
-                    actions,
-                    entropy: spectralEntropy.toFixed(3),
-                    flatness: spectralFlatness.toFixed(3),
-                    dynamics: (energyVariability * 100).toFixed(1) + ' %',
-                    voiced: (voicedRatio * 100).toFixed(1) + ' %'
-                };
-            }
-
-            function renderAudioResults(data) {
-                dropzone.classList.add('hidden');
-                resultsUI.classList.remove('hidden');
-
-                const badge = document.getElementById('res-badge');
-                if (data.risk === 'High') {
-                    badge.className = 'inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-lg w-max bg-red-100 text-red-800';
-                    badge.innerHTML = `<i data-lucide="alert-octagon" class="w-6 h-6"></i> High Risk AI Voice`;
-                } else if (data.risk === 'Moderate') {
-                    badge.className = 'inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-lg w-max bg-amber-100 text-amber-800';
-                    badge.innerHTML = `<i data-lucide="alert-triangle" class="w-6 h-6"></i> Moderate Suspicion`;
-                } else if (data.risk === 'Unknown') {
-                    badge.className = 'inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-lg w-max bg-gray-100 text-gray-700';
-                    badge.innerHTML = `<i data-lucide="help-circle" class="w-6 h-6"></i> Inconclusive`;
-                } else {
-                    badge.className = 'inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-lg w-max bg-green-100 text-green-800';
-                    badge.innerHTML = `<i data-lucide="check-circle" class="w-6 h-6"></i> Lower AI Suspicion`;
-                }
-
-                document.getElementById('res-confidence').textContent = `Confidence Score: ${data.score}%`;
-
-                const flagsList = document.getElementById('res-flags');
-                flagsList.innerHTML = data.flags.map(f => `
-                    <li class="flex items-start gap-2 text-sm text-gray-700">
-                        <i data-lucide="chevron-right" class="w-4 h-4 text-alertOrange flex-shrink-0 mt-0.5"></i> 
-                        <span>${f}</span>
-                    </li>
-                `).join('');
-
-                const actionsContainer = document.getElementById('res-actions');
-                actionsContainer.innerHTML = data.actions.map(a => `
-                    <p class="text-sm text-slate-800 flex items-start gap-2">
-                        <i data-lucide="arrow-right" class="w-4 h-4 text-shieldBlue flex-shrink-0 mt-0.5"></i> 
-                        <span>${a}</span>
-                    </p>
-                `).join('');
-
-                document.getElementById('res-entropy').textContent = data.entropy;
-                document.getElementById('res-flatness').textContent = data.flatness;
-                document.getElementById('res-dynamics').textContent = data.dynamics;
-                document.getElementById('res-voiced').textContent = data.voiced;
-
-                lucide.createIcons({ root: resultsUI });
-            }
-
-            let appMap = null;
-            let mapMarkers = [];
-
-            const sampleReports = [
-                { lat: 41.7606, lng: -88.3201, city: 'Aurora', type: 'AI Voice Cloning', desc: 'Received a cloned voice call claiming a family member needed immediate bail money.', time: '2 hours ago' },
-                { lat: 41.7508, lng: -88.1535, city: 'Naperville', type: 'Impersonation', desc: 'Fake call claiming to be ComEd demanding gift cards for unpaid bills.', time: '5 hours ago' },
-                { lat: 41.5250, lng: -88.0817, city: 'Joliet', type: 'Phishing Text', desc: 'SMS phishing message regarding an fake tollway unpaid balance.', time: '1 day ago' },
-                { lat: 42.0354, lng: -88.2826, city: 'Elgin', type: 'Utility Scam', desc: 'Fraudulent automated call threatening water shut-off in 30 minutes.', time: '1 day ago' }
-            ];
-
-            function initMap() {
-                // Centered on Illinois 11th Congressional District region
-                appMap = L.map('map-container').setView([41.7606, -88.25], 10);
-
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 18,
-                    attribution: '&copy; OpenStreetMap contributors'
-                }).addTo(appMap);
-
-                sampleReports.forEach(report => addReportToMapAndFeed(report));
-
-                document.getElementById('report-form').addEventListener('submit', (e) => {
-                    e.preventDefault();
-                    const type = document.getElementById('report-type').value;
-                    const cityVal = document.getElementById('report-city').value;
-                    const desc = document.getElementById('report-desc').value;
-
-                    if (!type || !cityVal || !desc) {
-                        showNotification('error', 'Please fill out all report fields.');
-                        return;
-                    }
-
-                    const [latStr, lngStr, cityName] = cityVal.split(',');
-                    const newReport = {
-                        lat: parseFloat(latStr),
-                        lng: parseFloat(lngStr),
-                        city: cityName,
-                        type,
-                        desc,
-                        time: 'Just now'
-                    };
-
-                    addReportToMapAndFeed(newReport, true);
-                    document.getElementById('report-form').reset();
-                    showNotification('success', 'Thank you! Your scam warning has been pinned to IL-11.');
-                });
-            }
-
-            function addReportToMapAndFeed(report, isNew = false) {
-                const marker = L.marker([report.lat, report.lng]).addTo(appMap);
-                marker.bindPopup(`
-                    <div class="p-1">
-                        <span class="text-xs font-bold uppercase tracking-wider text-shieldBlue">${report.type}</span>
-                        <h4 class="font-bold text-slate-900">${report.city}, IL</h4>
-                        <p class="text-xs text-gray-600 mt-1">${report.desc}</p>
-                        <span class="text-[10px] text-gray-400 mt-2 block">${report.time}</span>
-                    </div>
-                `);
-                mapMarkers.push(marker);
-
-                const feed = document.getElementById('community-feed');
-                const feedItem = document.createElement('div');
-                feedItem.className = 'p-3 rounded-xl bg-slateBg border border-gray-200 transition-all hover:border-shieldBlue';
-                feedItem.innerHTML = `
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="font-bold text-sm text-navy">${report.city} - ${report.type}</span>
-                        <span class="text-xs text-gray-400">${report.time}</span>
-                    </div>
-                    <p class="text-xs text-gray-600 leading-relaxed">${report.desc}</p>
-                `;
-
-                if (isNew) {
-                    feed.prepend(feedItem);
-                    appMap.setView([report.lat, report.lng], 11);
-                    marker.openPopup();
-                } else {
-                    feed.appendChild(feedItem);
-                }
-            }
-
-            const quizScenarios = [
-                {
-                    scenario: "You receive an urgent phone call from an unknown number. The voice sounds exactly like your child or grandchild saying they were in a car accident and need $2,000 via wire transfer immediately.",
-                    options: [
-                        { text: "Immediately wire the money to ensure their safety.", correct: false, reason: "Scammers use AI voice generators and emotional panic to demand non-traceable wire transfers." },
-                        { text: "Hang up, directly call your relative's regular cell number, or contact another family member to verify.", correct: true, reason: "Directly calling back on a known number breaks spoofed calls and verifies real safety." },
-                        { text: "Ask for their bank account number so you can send a check instead.", correct: false, reason: "Engaging in financial transactions with an unverified caller exposes sensitive banking details." }
-                    ],
-                    tip: "Under FCC guidelines, AI synthetic voice robocalls without consent are illegal. Always verify emergency calls through a separate channel."
-                },
-                {
-                    scenario: "An email claiming to be from your electricity provider states your account is delinquent and service will be terminated within 1 hour unless you pay via pre-paid gift cards.",
-                    options: [
-                        { text: "Buy gift cards immediately to prevent losing electric service.", correct: false, reason: "Legitimate utility providers never accept payment exclusively via pre-paid gift cards or cryptocurrency." },
-                        { text: "Ignore the email and check your balance on the official provider utility portal.", correct: true, reason: "Checking directly on official accounts ensures you rely on authentic billing records." }
-                    ],
-                    tip: "Illinois consumer protection laws prohibit utility disconnects without prior formal written notice by mail."
-                },
-                {
-                    scenario: "You receive a text message claiming: 'IL-Tollways Notice: You have an unpaid $4.50 toll fee. Click here to avoid a $50 legal penalty.'",
-                    options: [
-                        { text: "Click the text link and enter your credit card number right away.", correct: false, reason: "Smishing (SMS phishing) links lead to malicious clone sites designed to steal credit card data." },
-                        { text: "Delete the text or navigate manually to the official I-PASS website.", correct: true, reason: "Navigating directly to official web domains prevents credential theft." }
-                    ],
-                    tip: "Tollway authorities rarely request immediate payment over unsolicited SMS links."
-                }
-            ];
-
-            let currentQuizIndex = 0;
-            let quizScore = 0;
-
-            function loadQuizScenario() {
-                const q = quizScenarios[currentQuizIndex];
-                document.getElementById('quiz-step-badge').textContent = `Scenario ${currentQuizIndex + 1} of ${quizScenarios.length}`;
-                document.getElementById('quiz-scenario').textContent = q.scenario;
-                document.getElementById('quiz-progress').style.width = `${((currentQuizIndex) / quizScenarios.length) * 100}%`;
-
-                const optionsContainer = document.getElementById('quiz-options');
-                optionsContainer.innerHTML = '';
-
-                document.getElementById('quiz-feedback-area').classList.add('hidden');
-
-                q.options.forEach((opt, idx) => {
-                    const btn = document.createElement('button');
-                    btn.className = 'w-full text-left p-4 rounded-xl border border-gray-200 hover:border-shieldBlue hover:bg-blue-50 transition-all font-medium text-slate-800 focus:outline-none';
-                    btn.textContent = `${String.fromCharCode(65 + idx)}. ${opt.text}`;
-                    btn.addEventListener('click', () => handleQuizAnswer(opt, q));
-                    optionsContainer.appendChild(btn);
-                });
-            }
-
-            function handleQuizAnswer(selectedOption, scenario) {
-                const optionsContainer = document.getElementById('quiz-options');
-                Array.from(optionsContainer.children).forEach(btn => btn.disabled = true);
-
-                const feedbackArea = document.getElementById('quiz-feedback-area');
-                const feedbackBox = document.getElementById('quiz-feedback-box');
-                const feedbackTitle = document.getElementById('quiz-feedback-title');
-                const feedbackText = document.getElementById('quiz-feedback-text');
-                const feedbackLaw = document.getElementById('quiz-feedback-law');
-
-                feedbackArea.classList.remove('hidden');
-
-                if (selectedOption.correct) {
-                    quizScore++;
-                    feedbackBox.className = 'p-5 rounded-xl mb-6 bg-green-50 border border-green-200';
-                    feedbackTitle.className = 'font-bold text-lg mb-2 flex items-center gap-2 text-green-800';
-                    feedbackTitle.innerHTML = `<i data-lucide="check-circle-2" class="w-5 h-5 text-green-600"></i> Correct Defense!`;
-                } else {
-                    feedbackBox.className = 'p-5 rounded-xl mb-6 bg-red-50 border border-red-200';
-                    feedbackTitle.className = 'font-bold text-lg mb-2 flex items-center gap-2 text-red-800';
-                    feedbackTitle.innerHTML = `<i data-lucide="x-circle" class="w-5 h-5 text-red-600"></i> Vulnerable Action`;
-                }
-
-                feedbackText.textContent = selectedOption.reason;
-                feedbackLaw.textContent = scenario.tip;
-                lucide.createIcons({ root: feedbackBox });
-            }
-
-            document.getElementById('btn-next-question').addEventListener('click', () => {
-                currentQuizIndex++;
-                if (currentQuizIndex < quizScenarios.length) {
-                    loadQuizScenario();
-                } else {
-                    showQuizEndScreen();
-                }
+                try { localStorage.setItem('idshield.lastReport', String(Date.now())); } catch {}
+                addReport(report, true);
+                form.reset();
+                showNotification('success', sb ? 'Thanks! Your report is now visible to the community.' : 'Report added (saved on this device only).');
             });
+        }
 
-            function showQuizEndScreen() {
-                document.getElementById('quiz-progress').style.width = '100%';
-                document.getElementById('quiz-question-area').classList.add('hidden');
-                document.getElementById('quiz-feedback-area').classList.add('hidden');
-                
-                const endArea = document.getElementById('quiz-end-area');
-                endArea.classList.remove('hidden');
-                
-                document.getElementById('quiz-score-summary').textContent = `You completed the training module and scored ${quizScore} out of ${quizScenarios.length} correctly!`;
-                lucide.createIcons({ root: endArea });
+        function addReport(r, isNew) {
+            const [baseLat, baseLng] = CITY_COORDS[r.city] || [41.7606, -88.25];
+            // Small random offset so pins don't stack and never mark an exact spot.
+            const jitter = () => (Math.random() - 0.5) * 0.03;
+            const lat = baseLat + jitter(), lng = baseLng + jitter();
+            const label = r.sample ? ' (Sample)' : '';
+
+            const marker = L.marker([lat, lng]).addTo(reportLayer);
+            marker.bindPopup(`
+                <div>
+                    <span style="font-size:11px;font-weight:700;text-transform:uppercase;color:#2563EB">${esc(r.type)}${label}</span>
+                    <h4 style="font-weight:700;margin:2px 0">${esc(r.city)}, IL</h4>
+                    <p style="font-size:12px;color:#475569;margin:4px 0">${esc(r.desc)}</p>
+                    <span style="font-size:10px;color:#94A3B8">${esc(timeAgo(r.ts))}</span>
+                </div>`);
+
+            const feed = document.getElementById('community-feed');
+            const item = document.createElement('div');
+            item.className = 'p-3 rounded-xl bg-slateBg border border-gray-200 transition-all hover:border-shieldBlue';
+            item.innerHTML = `
+                <div class="flex items-center justify-between mb-1 gap-2">
+                    <span class="font-bold text-sm text-navy">${esc(r.city)} - ${esc(r.type)}${label}</span>
+                    <span class="text-xs text-gray-400 whitespace-nowrap">${esc(timeAgo(r.ts))}</span>
+                </div>
+                <p class="text-xs text-gray-600 leading-relaxed">${esc(r.desc)}</p>`;
+            feed.prepend(item);
+
+            if (isNew) { appMap.setView([lat, lng], 11); marker.openPopup(); }
+        }
+
+        /* ---------- simulator ---------- */
+        const quizScenarios = [
+            {
+                scenario: 'Your phone rings from an unknown number. The voice sounds exactly like your grandchild: "Grandma, I was in an accident and I\'m in trouble. I need $2,000 wired right now. Please don\'t tell Mom."',
+                options: [
+                    { text: 'Wire the money immediately. They sound scared and every minute counts.', correct: false, reason: 'Scammers use cloned voices and panic to rush you into untraceable payments. Secrecy ("don\'t tell Mom") is a classic red flag.' },
+                    { text: 'Hang up, then call your grandchild (or their parent) on the number you already have.', correct: true, reason: 'Calling back on a known number breaks the scam and quickly shows whether the emergency is real.' },
+                    { text: 'Stay on the line and ask them to describe where they are so you can judge if it\'s really them.', correct: false, reason: 'Staying on the line keeps you under the scammer\'s control, and they can improvise answers. Hang up and verify independently.' }
+                ],
+                tip: 'Set a family safe word ahead of time. The FCC has ruled that AI-generated voices in robocalls fall under the TCPA, so these calls are illegal without consent.'
+            },
+            {
+                scenario: 'An email that looks like it\'s from your electric company says your account is delinquent and service will be cut off in 1 hour unless you pay with prepaid gift cards.',
+                options: [
+                    { text: 'Buy the gift cards right away so you don\'t lose power.', correct: false, reason: 'No legitimate utility demands gift cards. They are a favorite payment method for scammers because they\'re nearly impossible to trace.' },
+                    { text: 'Ignore the email and check your account through the utility\'s official website or the phone number on your bill.', correct: true, reason: 'Checking your real account shows your true balance and any real notices.' },
+                    { text: 'Reply to the email asking them to confirm your account number.', correct: false, reason: 'Replying confirms your address is active and may hand over more personal information.' }
+                ],
+                tip: 'Regulated Illinois utilities generally must give written notice before disconnecting service, not a one-hour ultimatum. Confirm details with your utility or the Illinois Commerce Commission.'
+            },
+            {
+                scenario: 'You get a text: "Unpaid toll balance of $4.50. Pay now at the link below to avoid a $50 late fee."',
+                options: [
+                    { text: 'Tap the link and enter your card number to clear it quickly.', correct: false, reason: 'These "smishing" links lead to look-alike sites built to steal card details.' },
+                    { text: 'Delete the text. If you\'re worried, open the toll agency\'s official site by typing the address yourself.', correct: true, reason: 'Going to the official site yourself avoids look-alike links.' },
+                    { text: 'Reply STOP to unsubscribe.', correct: false, reason: 'Replying tells the scammer your number is active, which can bring more messages.' }
+                ],
+                tip: 'Report scam texts by forwarding them to 7726 (SPAM) and to the FTC at ReportFraud.ftc.gov.'
+            },
+            {
+                scenario: 'A caller says they\'re from your bank\'s fraud department. They say a 6-digit code was just texted to you and ask you to read it back "to confirm it\'s really you."',
+                options: [
+                    { text: 'Read the code. They already know your name and the last 4 digits of your card.', correct: false, reason: 'Those details are often leaked or bought. The code is the key to your account, and the scammer triggered it themselves.' },
+                    { text: 'Hang up and call the number on the back of your card.', correct: true, reason: 'The number on your card reaches your real bank, and they can tell you whether anything is wrong.' },
+                    { text: 'Ask them to text you the code again to check that it matches.', correct: false, reason: 'It doesn\'t matter how many times it\'s sent. Anyone who gets the code can take over your account.' }
+                ],
+                tip: 'Banks never ask you to read out one-time codes. Anyone who does is trying to get into your account.'
+            },
+            {
+                scenario: 'While browsing, a full-screen pop-up with a loud alarm says "VIRUS DETECTED! Call Microsoft Support now" and shows a phone number.',
+                options: [
+                    { text: 'Call the number. They\'ll know how to fix it.', correct: false, reason: 'This is tech-support fraud. They\'ll ask for remote access and payment, and may drain your accounts.' },
+                    { text: 'Don\'t call. Close the browser (force-quit it if needed) and run your real antivirus if you\'re worried.', correct: true, reason: 'Browser pop-ups can\'t detect viruses. The alarm is designed to scare you into calling.' },
+                    { text: 'Click "Scan Now" in the pop-up to see what it finds.', correct: false, reason: 'The button usually downloads malware or leads to the same scam.' }
+                ],
+                tip: 'Real companies don\'t put their phone numbers in browser pop-ups. If someone asks for remote access to your computer, say no.'
             }
+        ];
 
-            document.getElementById('btn-restart-quiz').addEventListener('click', () => {
-                currentQuizIndex = 0;
-                quizScore = 0;
-                document.getElementById('quiz-end-area').classList.add('hidden');
-                document.getElementById('quiz-question-area').classList.remove('hidden');
-                loadQuizScenario();
-            });
+        let quizOrder = [];
+        let currentQuizIndex = 0;
+        let quizScore = 0;
 
-            // Initialize simulator quiz on start
+        function shuffle(arr) {
+            const a = [...arr];
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        }
+
+        function startQuiz() {
+            quizOrder = shuffle(quizScenarios);
+            currentQuizIndex = 0;
+            quizScore = 0;
+            document.getElementById('quiz-end-area').classList.add('hidden');
+            document.getElementById('quiz-question-area').classList.remove('hidden');
             loadQuizScenario();
+        }
+
+        function loadQuizScenario() {
+            const q = quizOrder[currentQuizIndex];
+            document.getElementById('quiz-step-badge').textContent = `Scenario ${currentQuizIndex + 1} of ${quizOrder.length}`;
+            document.getElementById('quiz-scenario').textContent = q.scenario;
+            document.getElementById('quiz-progress').style.width = `${(currentQuizIndex / quizOrder.length) * 100}%`;
+            document.getElementById('quiz-feedback-area').classList.add('hidden');
+
+            const container = document.getElementById('quiz-options');
+            container.innerHTML = '';
+            // Shuffle every time so the right answer isn't always in the same slot.
+            shuffle(q.options).forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'quiz-opt w-full text-left p-4 rounded-xl border border-gray-200 hover:border-shieldBlue hover:bg-blue-50 transition-all font-medium text-slate-800';
+                btn.textContent = `${String.fromCharCode(65 + idx)}. ${opt.text}`;
+                btn.addEventListener('click', () => handleQuizAnswer(opt, q, btn));
+                btn._correct = opt.correct;
+                container.appendChild(btn);
+            });
+        }
+
+        function handleQuizAnswer(selected, scenario, clickedBtn) {
+            const buttons = Array.from(document.getElementById('quiz-options').children);
+            buttons.forEach(b => {
+                b.disabled = true;
+                b.classList.remove('hover:border-shieldBlue', 'hover:bg-blue-50');
+                if (b._correct) b.classList.add('border-green-400', 'bg-green-50');
+            });
+            if (!selected.correct) clickedBtn.classList.add('border-red-400', 'bg-red-50');
+
+            const box = document.getElementById('quiz-feedback-box');
+            const title = document.getElementById('quiz-feedback-title');
+            document.getElementById('quiz-feedback-area').classList.remove('hidden');
+
+            if (selected.correct) {
+                quizScore++;
+                box.className = 'p-5 rounded-xl mb-6 bg-green-50 border border-green-200';
+                title.className = 'font-bold text-lg mb-2 flex items-center gap-2 text-green-800';
+                title.innerHTML = '<i data-lucide="check-circle-2" class="w-5 h-5 text-green-600"></i> Correct';
+            } else {
+                box.className = 'p-5 rounded-xl mb-6 bg-red-50 border border-red-200';
+                title.className = 'font-bold text-lg mb-2 flex items-center gap-2 text-red-800';
+                title.innerHTML = '<i data-lucide="x-circle" class="w-5 h-5 text-red-600"></i> Risky choice';
+            }
+            document.getElementById('quiz-feedback-text').textContent = selected.reason;
+            document.getElementById('quiz-feedback-law').textContent = scenario.tip;
+            lucide.createIcons({ root: box });
+
+            const next = document.getElementById('btn-next-question');
+            next.textContent = currentQuizIndex === quizOrder.length - 1 ? 'See Results' : 'Next Scenario';
+            next.focus();
+        }
+
+        document.getElementById('btn-next-question').addEventListener('click', () => {
+            currentQuizIndex++;
+            if (currentQuizIndex < quizOrder.length) loadQuizScenario();
+            else showQuizEndScreen();
         });
+
+        function showQuizEndScreen() {
+            document.getElementById('quiz-progress').style.width = '100%';
+            document.getElementById('quiz-question-area').classList.add('hidden');
+            document.getElementById('quiz-feedback-area').classList.add('hidden');
+            document.getElementById('quiz-end-area').classList.remove('hidden');
+            const total = quizOrder.length;
+            const msg = quizScore === total
+                ? 'Perfect score. The core habit is always the same: stop, hang up, and verify on your own.'
+                : 'Review the tips above. The core habit is always the same: stop, hang up, and verify on your own.';
+            document.getElementById('quiz-score-summary').textContent = `You got ${quizScore} of ${total} right. ${msg}`;
+        }
+
+        document.getElementById('btn-restart-quiz').addEventListener('click', startQuiz);
+        startQuiz();
+    });
     </script>
 </body>
 </html>
-
-
